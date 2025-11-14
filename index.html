@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>商品利润记录</title>
+  <!-- Tailwind CSS v3 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <!-- 统一的 Tailwind 配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1E40AF',
+            secondary: '#3B82F6',
+            accent: '#60A5FA',
+            neutral: '#F3F4F6',
+            'neutral-dark': '#D1D5DB',
+            danger: '#EF4444',
+            success: '#10B981',
+            warning: '#F59E0B',
+            info: '#3B82F6',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .glass-effect {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .transition-all-300 {
+        transition: all 0.3s ease;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen">
+  <!-- 主容器 -->
+  <div id="app" class="max-w-md mx-auto bg-white min-h-screen relative">
+    <!-- 页面容器 -->
+    <div class="pages-container">
+      <!-- 商品列表页面 -->
+      <div id="products-page" class="page active">
+        <!-- 顶部排序选项 -->
+        <div class="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div class="flex items-center justify-between px-4 py-3">
+            <h1 class="text-lg font-bold text-primary">商品利润记录</h1>
+            <div class="relative">
+              <button id="sort-button" class="flex items-center text-sm text-gray-600 hover:text-primary transition-all-300">
+                <span id="current-sort">最新创建</span>
+                <i class="fa fa-chevron-down ml-1 text-xs"></i>
+              </button>
+              <div id="sort-dropdown" class="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg hidden z-20">
+                <ul class="py-1">
+                  <li><button class="sort-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-sort="createdAt-desc">最新创建</button></li>
+                  <li><button class="sort-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-sort="soldDate-desc">最新出售</button></li>
+                  <li><button class="sort-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-sort="profit-desc">最高利润</button></li>
+                  <li><button class="sort-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-sort="price-desc">最高价格</button></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 商品列表容器 -->
+        <div id="products-list" class="p-4 pb-20">
+          <!-- 商品卡片将通过JavaScript动态生成 -->
+          <div class="text-center py-10 text-gray-500" id="empty-state">
+            <i class="fa fa-shopping-bag text-4xl mb-3"></i>
+            <p>暂无商品记录</p>
+            <p class="text-sm">点击右下角按钮添加商品</p>
+          </div>
+        </div>
+        
+        <!-- 添加商品按钮 -->
+        <button id="add-product-btn" class="fixed right-6 bottom-20 w-14 h-14 bg-primary rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary/90 transition-all-300">
+          <i class="fa fa-plus text-xl"></i>
+        </button>
+      </div>
+      
+      <!-- 利润数据页面 -->
+      <div id="profit-page" class="page hidden">
+        <!-- 顶部筛选选项 -->
+        <div class="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div class="flex items-center justify-between px-4 py-3">
+            <h1 class="text-lg font-bold text-primary">利润数据</h1>
+            <div class="relative">
+              <button id="profit-filter-button" class="flex items-center text-sm text-gray-600 hover:text-primary transition-all-300">
+                <span id="current-filter">所有利润</span>
+                <i class="fa fa-chevron-down ml-1 text-xs"></i>
+              </button>
+              <div id="profit-filter-dropdown" class="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg hidden z-20">
+                <ul class="py-1">
+                  <li><button class="filter-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-filter="all">所有利润</button></li>
+                  <li><button class="filter-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-filter="thisMonth">本月利润</button></li>
+                  <li><button class="filter-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-filter="lastMonth">上月利润</button></li>
+                  <li><button class="filter-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-filter="custom">指定月份</button></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 自定义月份选择器 (默认隐藏) -->
+        <div id="custom-month-picker" class="bg-white border-b border-gray-200 p-4 hidden">
+          <div class="flex items-center justify-between">
+            <button id="prev-month" class="text-gray-600 hover:text-primary">
+              <i class="fa fa-chevron-left"></i>
+            </button>
+            <h2 id="current-month-display" class="text-lg font-medium"></h2>
+            <button id="next-month" class="text-gray-600 hover:text-primary">
+              <i class="fa fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- 利润数据展示 -->
+        <div class="p-6">
+          <div class="text-center mb-8">
+            <h2 id="profit-period" class="text-gray-500 text-sm mb-1">所有时间</h2>
+            <p id="total-profit" class="text-4xl font-bold text-primary">¥0</p>
+            <p class="text-gray-500 text-sm mt-1">总利润</p>
+          </div>
+          
+          <!-- 利润图表 -->
+          <div class="bg-white rounded-lg shadow-card p-4 mb-6">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">利润趋势</h3>
+            <div class="h-48">
+              <canvas id="profit-chart"></canvas>
+            </div>
+          </div>
+          
+          <!-- 销售统计 -->
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-card p-4">
+              <h3 class="text-sm font-medium text-gray-700 mb-1">已售商品</h3>
+              <p id="sold-count" class="text-2xl font-bold text-primary">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-card p-4">
+              <h3 class="text-sm font-medium text-gray-700 mb-1">未售商品</h3>
+              <p id="unsold-count" class="text-2xl font-bold text-gray-500">0</p>
+            </div>
+          </div>
+          
+          <!-- 利润最高商品 -->
+          <div class="bg-white rounded-lg shadow-card p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">利润最高商品</h3>
+            <div id="top-profit-product" class="text-center py-4 text-gray-500">
+              <p>暂无数据</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 添加/编辑商品表单 -->
+      <div id="form-page" class="page hidden fixed inset-0 bg-white z-20 overflow-y-auto">
+        <div class="p-4">
+          <div class="flex items-center justify-between mb-6">
+            <h1 id="form-title" class="text-lg font-bold text-primary">添加商品</h1>
+            <button id="close-form" class="text-gray-500 hover:text-gray-700">
+              <i class="fa fa-times text-xl"></i>
+            </button>
+          </div>
+          
+          <form id="product-form" class="space-y-4">
+            <input type="hidden" id="product-id">
+            
+            <div>
+              <label for="product-name" class="block text-sm font-medium text-gray-700 mb-1">商品名称 <span class="text-danger">*</span></label>
+              <input type="text" id="product-name" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" required>
+            </div>
+            
+            <div>
+              <label for="product-cost" class="block text-sm font-medium text-gray-700 mb-1">商品成本 <span class="text-danger">*</span></label>
+              <div class="relative">
+                <span class="absolute left-3 top-2.5 text-gray-500">¥</span>
+                <input type="number" id="product-cost" name="cost" step="0.01" min="0" class="w-full px-8 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" required>
+              </div>
+            </div>
+            
+            <div>
+              <label for="product-price" class="block text-sm font-medium text-gray-700 mb-1">商品售价</label>
+              <div class="relative">
+                <span class="absolute left-3 top-2.5 text-gray-500">¥</span>
+                <input type="number" id="product-price" name="price" step="0.01" min="0" class="w-full px-8 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+              </div>
+            </div>
+            
+            <div>
+              <label for="product-date" class="block text-sm font-medium text-gray-700 mb-1">出售日期</label>
+              <input type="date" id="product-date" name="soldDate" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">商品原始图片 <span class="text-danger">*</span></label>
+              <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-primary transition-all-300 cursor-pointer" onclick="document.getElementById('original-image').click();">
+                <input type="file" id="original-image" name="originalImage" accept="image/*" class="hidden" onchange="previewImage(this, document.getElementById('original-image-preview'), true);">
+                <div id="original-image-preview" class="mb-2 h-32 flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
+                  <i class="fa fa-camera text-gray-400 text-2xl"></i>
+                </div>
+                <p class="text-sm text-gray-500">点击上传图片</p>
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">商品成品图片</label>
+              <div class="border-2 border-dashed border-gray-300 rounded-md p-4 text-center hover:border-primary transition-all-300 cursor-pointer" onclick="document.getElementById('finished-image').click();">
+                <input type="file" id="finished-image" name="finishedImage" accept="image/*" class="hidden" onchange="previewImage(this, document.getElementById('finished-image-preview'), false);">
+                <div id="finished-image-preview" class="mb-2 h-32 flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
+                  <i class="fa fa-camera text-gray-400 text-2xl"></i>
+                </div>
+                <p class="text-sm text-gray-500">点击上传图片</p>
+              </div>
+            </div>
+            
+            <div class="pt-4">
+              <button type="submit" class="w-full bg-primary text-white py-2.5 px-4 rounded-md hover:bg-primary/90 transition-all-300 font-medium">保存</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <!-- 商品详情页 -->
+      <div id="detail-page" class="page hidden fixed inset-0 bg-white z-20 overflow-y-auto">
+        <div class="p-4">
+          <div class="flex items-center justify-between mb-4">
+            <button id="back-to-list" class="text-gray-500 hover:text-gray-700">
+              <i class="fa fa-arrow-left text-xl"></i>
+            </button>
+            <div class="relative">
+              <button id="detail-menu-button" class="text-gray-500 hover:text-gray-700">
+                <i class="fa fa-ellipsis-v text-xl"></i>
+              </button>
+              <div id="detail-menu" class="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg hidden z-30">
+                <ul class="py-1">
+                  <li><button id="edit-product" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">编辑</button></li>
+                  <li><button id="delete-product" class="w-full text-left px-4 py-2 text-sm text-danger hover:bg-gray-100">删除</button></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          <div id="product-detail" class="space-y-4">
+            <!-- 商品详情将通过JavaScript动态生成 -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- 确认删除对话框 -->
+      <div id="confirm-dialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg w-11/12 max-w-md p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-2">确认删除</h3>
+          <p class="text-gray-500 mb-6">确定要删除这个商品记录吗？此操作无法撤销。</p>
+          <div class="flex space-x-3">
+            <button id="cancel-delete" class="flex-1 py-2 px-4 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-all-300">取消</button>
+            <button id="confirm-delete" class="flex-1 py-2 px-4 bg-danger text-white rounded-md hover:bg-danger/90 transition-all-300">删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 底部导航 -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 flex justify-around items-center h-16 z-10">
+      <button id="nav-products" class="nav-btn flex flex-col items-center justify-center text-primary">
+        <i class="fa fa-list text-xl"></i>
+        <span class="text-xs mt-1">商品</span>
+      </button>
+      <button id="nav-profit" class="nav-btn flex flex-col items-center justify-center text-gray-400">
+        <i class="fa fa-bar-chart text-xl"></i>
+        <span class="text-xs mt-1">利润</span>
+      </button>
+    </nav>
+  </div>
+
+  <script>
+    // 全局变量
+    let products = JSON.parse(localStorage.getItem('products')) || [];
+    let currentProductId = null;
+    let currentSort = 'createdAt-desc';
+    let currentFilter = 'all';
+    let currentCustomMonth = new Date();
+    let profitChart = null;
+    
+    // 全局图片处理函数
+    function handleOriginalImageChange(event) {
+      console.log('原始图片已选择');
+      const input = event.target;
+      const previewElement = document.getElementById('original-image-preview');
+      previewImage(input, previewElement, true);
+    }
+    
+    function handleFinishedImageChange(event) {
+      console.log('成品图片已选择');
+      const input = event.target;
+      const previewElement = document.getElementById('finished-image-preview');
+      previewImage(input, previewElement, false);
+    }
+    
+    // DOM 元素
+    const app = document.getElementById('app');
+    const productsPage = document.getElementById('products-page');
+    const profitPage = document.getElementById('profit-page');
+    const formPage = document.getElementById('form-page');
+    const detailPage = document.getElementById('detail-page');
+    const confirmDialog = document.getElementById('confirm-dialog');
+    
+    const productsList = document.getElementById('products-list');
+    const emptyState = document.getElementById('empty-state');
+    const addProductBtn = document.getElementById('add-product-btn');
+    const closeFormBtn = document.getElementById('close-form');
+    const productForm = document.getElementById('product-form');
+    const formTitle = document.getElementById('form-title');
+    const productIdInput = document.getElementById('product-id');
+    const productNameInput = document.getElementById('product-name');
+    const productCostInput = document.getElementById('product-cost');
+    const productPriceInput = document.getElementById('product-price');
+    const productDateInput = document.getElementById('product-date');
+    const originalImageInput = document.getElementById('original-image');
+    const finishedImageInput = document.getElementById('finished-image');
+    const originalImagePreview = document.getElementById('original-image-preview');
+    const finishedImagePreview = document.getElementById('finished-image-preview');
+    
+    const backToListBtn = document.getElementById('back-to-list');
+    const detailMenuButton = document.getElementById('detail-menu-button');
+    const detailMenu = document.getElementById('detail-menu');
+    const editProductBtn = document.getElementById('edit-product');
+    const deleteProductBtn = document.getElementById('delete-product');
+    const cancelDeleteBtn = document.getElementById('cancel-delete');
+    const confirmDeleteBtn = document.getElementById('confirm-delete');
+    const productDetail = document.getElementById('product-detail');
+    
+    const sortButton = document.getElementById('sort-button');
+    const sortDropdown = document.getElementById('sort-dropdown');
+    const currentSortText = document.getElementById('current-sort');
+    const sortOptions = document.querySelectorAll('.sort-option');
+    
+    const profitFilterButton = document.getElementById('profit-filter-button');
+    const profitFilterDropdown = document.getElementById('profit-filter-dropdown');
+    const currentFilterText = document.getElementById('current-filter');
+    const filterOptions = document.querySelectorAll('.filter-option');
+    const customMonthPicker = document.getElementById('custom-month-picker');
+    const currentMonthDisplay = document.getElementById('current-month-display');
+    const prevMonthBtn = document.getElementById('prev-month');
+    const nextMonthBtn = document.getElementById('next-month');
+    
+    const profitPeriodText = document.getElementById('profit-period');
+    const totalProfitText = document.getElementById('total-profit');
+    const soldCountText = document.getElementById('sold-count');
+    const unsoldCountText = document.getElementById('unsold-count');
+    const topProfitProductContainer = document.getElementById('top-profit-product');
+    
+    const navProductsBtn = document.getElementById('nav-products');
+    const navProfitBtn = document.getElementById('nav-profit');
+    
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      renderProducts();
+      setupEventListeners();
+      updateProfitData();
+      addGuideButton();
+    });
+    
+    // 设置事件监听器
+    function setupEventListeners() {
+      // 确保DOM元素已加载
+      if (!originalImageInput || !finishedImageInput || !originalImagePreview || !finishedImagePreview) {
+        console.error('图片相关DOM元素未找到');
+        return;
+      }
+      // 添加商品按钮
+      addProductBtn.addEventListener('click', () => {
+        openForm();
+      });
+      
+      // 关闭表单按钮
+      closeFormBtn.addEventListener('click', () => {
+        closeForm();
+      });
+      
+      // 表单提交
+      productForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveProduct();
+      });
+      
+
+      
+      // 返回列表按钮
+      backToListBtn.addEventListener('click', () => {
+        showPage(productsPage);
+      });
+      
+      // 详情页菜单
+      detailMenuButton.addEventListener('click', () => {
+        detailMenu.classList.toggle('hidden');
+      });
+      
+      // 编辑商品
+      editProductBtn.addEventListener('click', () => {
+        detailMenu.classList.add('hidden');
+        openForm(currentProductId);
+      });
+      
+      // 删除商品
+      deleteProductBtn.addEventListener('click', () => {
+        detailMenu.classList.add('hidden');
+        confirmDialog.classList.remove('hidden');
+      });
+      
+      // 取消删除
+      cancelDeleteBtn.addEventListener('click', () => {
+        confirmDialog.classList.add('hidden');
+      });
+      
+      // 确认删除
+      confirmDeleteBtn.addEventListener('click', () => {
+        deleteProduct(currentProductId);
+        confirmDialog.classList.add('hidden');
+        showPage(productsPage);
+      });
+      
+      // 排序下拉菜单
+      sortButton.addEventListener('click', () => {
+        sortDropdown.classList.toggle('hidden');
+        profitFilterDropdown.classList.add('hidden');
+      });
+      
+      // 排序选项
+      sortOptions.forEach(option => {
+        option.addEventListener('click', () => {
+          currentSort = option.dataset.sort;
+          currentSortText.textContent = option.textContent;
+          sortDropdown.classList.add('hidden');
+          renderProducts();
+        });
+      });
+      
+      // 利润筛选下拉菜单
+      profitFilterButton.addEventListener('click', () => {
+        profitFilterDropdown.classList.toggle('hidden');
+        sortDropdown.classList.add('hidden');
+      });
+      
+      // 利润筛选选项
+      filterOptions.forEach(option => {
+        option.addEventListener('click', () => {
+          currentFilter = option.dataset.filter;
+          currentFilterText.textContent = option.textContent;
+          profitFilterDropdown.classList.add('hidden');
+          
+          // 显示/隐藏自定义月份选择器
+          if (currentFilter === 'custom') {
+            customMonthPicker.classList.remove('hidden');
+            updateCurrentMonthDisplay();
+          } else {
+            customMonthPicker.classList.add('hidden');
+          }
+          
+          updateProfitData();
+        });
+      });
+      
+      // 自定义月份导航
+      prevMonthBtn.addEventListener('click', () => {
+        currentCustomMonth.setMonth(currentCustomMonth.getMonth() - 1);
+        updateCurrentMonthDisplay();
+        updateProfitData();
+      });
+      
+      nextMonthBtn.addEventListener('click', () => {
+        currentCustomMonth.setMonth(currentCustomMonth.getMonth() + 1);
+        updateCurrentMonthDisplay();
+        updateProfitData();
+      });
+      
+      // 底部导航
+      navProductsBtn.addEventListener('click', () => {
+        showPage(productsPage);
+        navProductsBtn.classList.add('text-primary');
+        navProductsBtn.classList.remove('text-gray-400');
+        navProfitBtn.classList.add('text-gray-400');
+        navProfitBtn.classList.remove('text-primary');
+      });
+      
+      navProfitBtn.addEventListener('click', () => {
+        showPage(profitPage);
+        navProfitBtn.classList.add('text-primary');
+        navProfitBtn.classList.remove('text-gray-400');
+        navProductsBtn.classList.add('text-gray-400');
+        navProductsBtn.classList.remove('text-primary');
+        updateProfitData();
+      });
+      
+      // 点击页面其他区域关闭下拉菜单和商品卡片菜单
+      document.addEventListener('click', (e) => {
+        // 关闭排序下拉菜单
+        if (!sortButton.contains(e.target) && !sortDropdown.contains(e.target)) {
+          sortDropdown.classList.add('hidden');
+        }
+        
+        // 关闭利润筛选下拉菜单
+        if (!profitFilterButton.contains(e.target) && !profitFilterDropdown.contains(e.target)) {
+          profitFilterDropdown.classList.add('hidden');
+        }
+        
+        // 关闭详情页菜单
+        if (!detailMenuButton.contains(e.target) && !detailMenu.contains(e.target)) {
+          detailMenu.classList.add('hidden');
+        }
+        
+        // 关闭商品卡片菜单
+        const menuDropdowns = document.querySelectorAll('.menu-dropdown');
+        menuDropdowns.forEach(menu => {
+          // 检查点击是否在菜单内部或菜单按钮上
+          const menuButton = menu.closest('.product-card')?.querySelector('.view-menu');
+          if (!menu.contains(e.target) && (!menuButton || !menuButton.contains(e.target))) {
+            menu.remove();
+          }
+        });
+      });
+    }
+    
+    // 渲染商品列表
+    function renderProducts() {
+      console.log('渲染商品列表，商品数量:', products.length);
+      // 清空列表
+      productsList.innerHTML = '';
+      
+      // 检查是否有商品
+      if (products.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      
+      // 隐藏空状态
+      emptyState.classList.add('hidden');
+      
+      // 排序商品
+      const sortedProducts = sortProducts([...products]);
+      
+      // 创建商品卡片
+      sortedProducts.forEach(product => {
+        console.log('渲染商品:', product.name);
+        console.log('原始图片数据存在:', !!product.originalImage);
+        console.log('原始图片数据长度:', product.originalImage ? product.originalImage.length : 0);
+        console.log('成品图片数据存在:', !!product.finishedImage);
+        
+        const profit = calculateProfit(product);
+        const isSold = !!product.soldDate;
+        
+        const card = document.createElement('div');
+        card.className = 'product-card bg-white rounded-lg shadow-card mb-4 overflow-hidden hover:shadow-card-hover transition-all-300';
+        card.dataset.id = product.id;
+        
+        card.innerHTML = `
+          <div class="p-4">
+            <div class="flex justify-between items-start mb-3">
+              <div class="font-bold text-lg ${isSold ? 'text-primary' : 'text-gray-400'}">
+                ${isSold ? `¥${profit.toFixed(2)}` : 'NONE'}
+              </div>
+              <button class="text-gray-400 hover:text-gray-700 view-menu" data-id="${product.id}">
+                <i class="fa fa-ellipsis-v"></i>
+              </button>
+            </div>
+            
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="font-medium">${product.name}</h3>
+              <div class="flex space-x-2">
+                <button class="text-xs px-2 py-1 rounded-full bg-primary text-white view-original" data-id="${product.id}">原始</button>
+                ${product.finishedImage ? `<button class="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700 view-finished" data-id="${product.id}">成品</button>` : ''}
+              </div>
+            </div>
+            
+            <div class="aspect-square bg-gray-100 rounded-md mb-3 overflow-hidden">
+              <img src="${product.originalImage}" alt="${product.name}" class="w-full h-full object-cover product-image" data-id="${product.id}">
+            </div>
+            
+            <div class="flex justify-between text-sm text-gray-600 mb-2">
+              <div>成本: ¥${parseFloat(product.cost).toFixed(2)}</div>
+              <div>售价: ${isSold ? `¥${parseFloat(product.price).toFixed(2)}` : '-'}</div>
+            </div>
+            
+            <div class="text-xs text-gray-500">
+              ${isSold ? `出售日期: ${formatDate(product.soldDate)}` : '该商品尚未出售'}
+            </div>
+          </div>
+        `;
+        
+        productsList.appendChild(card);
+        
+        // 添加事件监听器
+        const productImage = card.querySelector('.product-image');
+        const viewOriginalBtn = card.querySelector('.view-original');
+        const viewFinishedBtn = card.querySelector('.view-finished');
+        const viewMenuBtn = card.querySelector('.view-menu');
+        
+        productImage.addEventListener('click', () => {
+          viewProductDetail(product.id);
+        });
+        
+        if (viewOriginalBtn) {
+          viewOriginalBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            productImage.src = product.originalImage;
+            viewOriginalBtn.classList.remove('bg-gray-200', 'text-gray-700');
+            viewOriginalBtn.classList.add('bg-primary', 'text-white');
+            if (viewFinishedBtn) {
+              viewFinishedBtn.classList.remove('bg-primary', 'text-white');
+              viewFinishedBtn.classList.add('bg-gray-200', 'text-gray-700');
+            }
+          });
+        }
+        
+        if (viewFinishedBtn) {
+          viewFinishedBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            productImage.src = product.finishedImage;
+            viewFinishedBtn.classList.remove('bg-gray-200', 'text-gray-700');
+            viewFinishedBtn.classList.add('bg-primary', 'text-white');
+            viewOriginalBtn.classList.remove('bg-primary', 'text-white');
+            viewOriginalBtn.classList.add('bg-gray-200', 'text-gray-700');
+          });
+        }
+        
+        viewMenuBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          
+          // 隐藏其他菜单
+          document.querySelectorAll('.menu-dropdown').forEach(menu => {
+            menu.classList.add('hidden');
+          });
+          
+          // 创建并显示菜单
+          const menu = document.createElement('div');
+          menu.className = 'menu-dropdown absolute right-4 mt-2 w-40 bg-white rounded-md shadow-lg z-20';
+          menu.innerHTML = `
+            <ul class="py-1">
+              <li><button class="edit-option w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-id="${product.id}">编辑</button></li>
+              <li><button class="delete-option w-full text-left px-4 py-2 text-sm text-danger hover:bg-gray-100" data-id="${product.id}">删除</button></li>
+            </ul>
+          `;
+          
+          // 移除之前的菜单
+          const oldMenu = card.querySelector('.menu-dropdown');
+          if (oldMenu) {
+            oldMenu.remove();
+          }
+          
+          // 添加新菜单
+          card.querySelector('.flex.justify-between.items-start').appendChild(menu);
+          
+          // 添加事件监听器
+          menu.querySelector('.edit-option').addEventListener('click', () => {
+            openForm(product.id);
+            menu.remove();
+          });
+          
+          menu.querySelector('.delete-option').addEventListener('click', () => {
+            currentProductId = product.id;
+            confirmDialog.classList.remove('hidden');
+            menu.remove();
+          });
+        });
+      });
+    }
+    
+    // 打开表单
+    function openForm(id = null) {
+      console.log('打开表单，ID:', id);
+      // 重置表单
+      productForm.reset();
+      originalImagePreview.innerHTML = '<i class="fa fa-camera text-gray-400 text-2xl"></i>';
+      finishedImagePreview.innerHTML = '<i class="fa fa-camera text-gray-400 text-2xl"></i>';
+      console.log('表单已重置');
+      
+      if (id) {
+        // 编辑模式
+        const product = products.find(p => p.id === id);
+        if (product) {
+          console.log('编辑模式，商品数据:', product);
+          formTitle.textContent = '编辑商品';
+          productIdInput.value = product.id;
+          productNameInput.value = product.name;
+          productCostInput.value = product.cost;
+          productPriceInput.value = product.price || '';
+          productDateInput.value = product.soldDate || '';
+          
+          if (product.originalImage) {
+            console.log('显示原始图片预览');
+            originalImagePreview.innerHTML = `<img src="${product.originalImage}" alt="${product.name}" class="w-full h-full object-cover">`;
+            console.log('原始图片已显示');
+          }
+          
+          if (product.finishedImage) {
+            console.log('显示成品图片预览');
+            finishedImagePreview.innerHTML = `<img src="${product.finishedImage}" alt="${product.name}" class="w-full h-full object-cover">`;
+            console.log('成品图片已显示');
+          }
+        }
+      } else {
+        // 添加模式
+        console.log('添加模式');
+        formTitle.textContent = '添加商品';
+        productIdInput.value = '';
+        // 设置默认日期为今天
+        const today = new Date().toISOString().split('T')[0];
+        productDateInput.value = today;
+      }
+      
+      showPage(formPage);
+    }
+    
+    // 关闭表单
+    function closeForm() {
+      showPage(productsPage);
+    }
+    
+    // 保存商品
+    function saveProduct() {
+      console.log('保存商品函数被调用');
+      const id = productIdInput.value || generateId();
+      const name = productNameInput.value;
+      const cost = parseFloat(productCostInput.value);
+      const price = productPriceInput.value ? parseFloat(productPriceInput.value) : null;
+      const soldDate = productDateInput.value || null;
+      
+      // 获取图片数据
+      let originalImage = null;
+      let finishedImage = null;
+      
+      const originalImg = document.getElementById('original-image-preview').querySelector('img');
+      const finishedImg = document.getElementById('finished-image-preview').querySelector('img');
+      
+      if (originalImg) {
+        originalImage = originalImg.src;
+        console.log('从预览区域获取原始图片数据，长度:', originalImage.length);
+      }
+      
+      if (finishedImg) {
+        finishedImage = finishedImg.src;
+        console.log('从预览区域获取成品图片数据，长度:', finishedImage.length);
+      }
+      
+      console.log('图片数据获取结果:');
+      console.log('原始图片数据存在:', !!originalImage);
+      console.log('成品图片数据存在:', !!finishedImage);
+      
+      // 验证必填项
+      if (!name) {
+        alert('请填写商品名称');
+        return;
+      }
+      
+      if (!cost || isNaN(cost) || cost <= 0) {
+        alert('请填写有效的商品成本');
+        return;
+      }
+      
+      // 验证原始图片
+      if (!originalImage) {
+        // 如果是编辑模式且没有新上传图片，尝试从现有商品中获取
+        if (productIdInput.value) {
+          const existingProduct = products.find(p => p.id === id);
+          if (existingProduct && existingProduct.originalImage) {
+            originalImage = existingProduct.originalImage;
+            console.log('从现有商品获取原始图片数据');
+          } else {
+            alert('请上传商品原始图片');
+            return;
+          }
+        } else {
+          // 添加新商品必须上传原始图片
+          alert('请上传商品原始图片');
+          return;
+        }
+      }
+      
+      const productData = {
+        id,
+        name,
+        cost,
+        price,
+        soldDate,
+        originalImage,
+        finishedImage,
+        createdAt: productIdInput.value ? products.find(p => p.id === id).createdAt : new Date().toISOString()
+      };
+      
+      console.log('准备保存的商品数据:', productData);
+      
+      if (productIdInput.value) {
+        // 更新商品
+        const index = products.findIndex(p => p.id === id);
+        if (index !== -1) {
+          products[index] = productData;
+          console.log('更新商品成功');
+        }
+      } else {
+        // 添加新商品
+        products.unshift(productData);
+        console.log('添加新商品成功');
+      }
+      
+      // 保存到本地存储
+      saveProducts();
+      console.log('商品数据已保存到本地存储');
+      
+      // 更新UI
+      renderProducts();
+      updateProfitData();
+      console.log('UI已更新');
+      
+      // 关闭表单
+      closeForm();
+    }
+    
+    // 删除商品
+    function deleteProduct(id) {
+      products = products.filter(product => product.id !== id);
+      saveProducts();
+      renderProducts();
+      updateProfitData();
+    }
+    
+    // 查看商品详情
+    function viewProductDetail(id) {
+      currentProductId = id;
+      const product = products.find(p => p.id === id);
+      
+      if (!product) return;
+      
+      const profit = calculateProfit(product);
+      const isSold = !!product.soldDate;
+      
+      productDetail.innerHTML = `
+        <div class="flex justify-between items-start mb-3">
+          <div class="font-bold text-lg ${isSold ? 'text-primary' : 'text-gray-400'}">
+            ${isSold ? `¥${profit.toFixed(2)}` : 'NONE'}
+          </div>
+        </div>
+        
+        <h2 class="text-xl font-bold mb-3">${product.name}</h2>
+        
+        <div class="aspect-square bg-gray-100 rounded-md mb-4 overflow-hidden">
+          <img src="${product.originalImage}" alt="${product.name}" class="w-full h-full object-cover" id="detail-image">
+        </div>
+        
+        <div class="flex justify-between items-center mb-4">
+          <div class="text-sm text-gray-600">成本: ¥${parseFloat(product.cost).toFixed(2)}</div>
+          <div class="text-sm text-gray-600">售价: ${isSold ? `¥${parseFloat(product.price).toFixed(2)}` : '-'}</div>
+        </div>
+        
+        <div class="text-sm text-gray-500">
+          ${isSold ? `出售日期: ${formatDate(product.soldDate)}` : '该商品尚未出售'}
+        </div>
+        
+        ${product.finishedImage ? `
+          <div class="mt-4 flex justify-center space-x-3">
+            <button id="detail-view-original" class="text-xs px-3 py-1 rounded-full bg-primary text-white">原始图</button>
+            <button id="detail-view-finished" class="text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-700">成品图</button>
+          </div>
+        ` : ''}
+      `;
+      
+      // 添加图片切换事件
+      if (product.finishedImage) {
+        const detailImage = document.getElementById('detail-image');
+        const viewOriginalBtn = document.getElementById('detail-view-original');
+        const viewFinishedBtn = document.getElementById('detail-view-finished');
+        
+        viewOriginalBtn.addEventListener('click', () => {
+          detailImage.src = product.originalImage;
+          viewOriginalBtn.classList.remove('bg-gray-200', 'text-gray-700');
+          viewOriginalBtn.classList.add('bg-primary', 'text-white');
+          viewFinishedBtn.classList.remove('bg-primary', 'text-white');
+          viewFinishedBtn.classList.add('bg-gray-200', 'text-gray-700');
+        });
+        
+        viewFinishedBtn.addEventListener('click', () => {
+          detailImage.src = product.finishedImage;
+          viewFinishedBtn.classList.remove('bg-gray-200', 'text-gray-700');
+          viewFinishedBtn.classList.add('bg-primary', 'text-white');
+          viewOriginalBtn.classList.remove('bg-primary', 'text-white');
+          viewOriginalBtn.classList.add('bg-gray-200', 'text-gray-700');
+        });
+      }
+      
+      showPage(detailPage);
+    }
+    
+    // 更新利润数据
+    function updateProfitData() {
+      const filteredProducts = filterProductsByDate([...products]);
+      const soldProducts = filteredProducts.filter(p => p.soldDate);
+      const unsoldProducts = filteredProducts.filter(p => !p.soldDate);
+      
+      // 计算总利润
+      let totalProfit = 0;
+      soldProducts.forEach(product => {
+        totalProfit += calculateProfit(product);
+      });
+      
+      // 更新统计数据
+      totalProfitText.textContent = `¥${totalProfit.toFixed(2)}`;
+      soldCountText.textContent = soldProducts.length;
+      unsoldCountText.textContent = unsoldProducts.length;
+      
+      // 更新时间周期文本
+      updateProfitPeriodText();
+      
+      // 更新利润最高商品
+      updateTopProfitProduct(soldProducts);
+      
+      // 更新图表
+      updateProfitChart(filteredProducts);
+    }
+    
+    // 更新利润周期文本
+    function updateProfitPeriodText() {
+      const now = new Date();
+      let periodText = '';
+      
+      switch (currentFilter) {
+        case 'all':
+          periodText = '所有时间';
+          break;
+        case 'thisMonth':
+          periodText = `${now.getFullYear()}年${now.getMonth() + 1}月`;
+          break;
+        case 'lastMonth':
+          const lastMonth = new Date(now);
+          lastMonth.setMonth(now.getMonth() - 1);
+          periodText = `${lastMonth.getFullYear()}年${lastMonth.getMonth() + 1}月`;
+          break;
+        case 'custom':
+          periodText = `${currentCustomMonth.getFullYear()}年${currentCustomMonth.getMonth() + 1}月`;
+          break;
+      }
+      
+      profitPeriodText.textContent = periodText;
+    }
+    
+    // 更新利润最高商品
+    function updateTopProfitProduct(soldProducts) {
+      if (soldProducts.length === 0) {
+        topProfitProductContainer.innerHTML = '<p>暂无数据</p>';
+        return;
+      }
+      
+      // 按利润排序
+      const sortedProducts = [...soldProducts].sort((a, b) => calculateProfit(b) - calculateProfit(a));
+      const topProduct = sortedProducts[0];
+      
+      topProfitProductContainer.innerHTML = `
+        <div class="flex items-center space-x-3">
+          <div class="w-12 h-12 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
+            <img src="${topProduct.originalImage}" alt="${topProduct.name}" class="w-full h-full object-cover">
+          </div>
+          <div class="text-left">
+            <h4 class="font-medium">${topProduct.name}</h4>
+            <p class="text-sm text-primary font-bold">¥${calculateProfit(topProduct).toFixed(2)}</p>
+          </div>
+        </div>
+      `;
+    }
+    
+    // 更新利润图表
+    function updateProfitChart(products) {
+      const ctx = document.getElementById('profit-chart').getContext('2d');
+      
+      // 按日期分组
+      const profitByDate = {};
+      
+      products.forEach(product => {
+        if (product.soldDate) {
+          const date = product.soldDate.split('T')[0]; // YYYY-MM-DD
+          if (!profitByDate[date]) {
+            profitByDate[date] = 0;
+          }
+          profitByDate[date] += calculateProfit(product);
+        }
+      });
+      
+      // 转换为数组并排序
+      const profitData = Object.entries(profitByDate)
+        .map(([date, profit]) => ({ date, profit }))
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      // 准备图表数据
+      const labels = profitData.map(item => {
+        const date = new Date(item.date);
+        return `${date.getMonth() + 1}/${date.getDate()}`;
+      });
+      
+      const data = profitData.map(item => item.profit);
+      
+      // 销毁旧图表
+      if (profitChart) {
+        profitChart.destroy();
+      }
+      
+      // 创建新图表
+      profitChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '利润',
+            data: data,
+            backgroundColor: '#3B82F6',
+            borderRadius: 4,
+            barThickness: 12
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `利润: ¥${context.raw.toFixed(2)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return `¥${value}`;
+                }
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // 辅助函数
+    
+    // 显示页面
+    function showPage(page) {
+      document.querySelectorAll('.page').forEach(p => {
+        p.classList.add('hidden');
+      });
+      page.classList.remove('hidden');
+    }
+    
+    // 保存商品到本地存储
+    function saveProducts() {
+      try {
+        localStorage.setItem('products', JSON.stringify(products));
+        console.log('商品数据已成功保存到本地存储');
+      } catch (error) {
+        if (error.name === 'QuotaExceededError') {
+          console.error('本地存储空间不足，尝试清理数据...');
+          
+          // 尝试清理策略
+          if (cleanUpStorage()) {
+            // 清理成功后再次尝试保存
+            try {
+              localStorage.setItem('products', JSON.stringify(products));
+              console.log('清理空间后，商品数据已成功保存');
+            } catch (secondError) {
+              console.error('清理空间后仍无法保存:', secondError);
+              alert('存储空间不足，请删除一些商品或图片后再试。');
+            }
+          } else {
+            console.error('无法清理足够的存储空间');
+            alert('存储空间不足，请删除一些商品或图片后再试。');
+          }
+        } else {
+          console.error('保存商品数据失败:', error);
+          alert('保存商品失败: ' + error.message);
+        }
+      }
+    }
+    
+    // 清理本地存储空间
+    function cleanUpStorage() {
+      console.log('正在清理本地存储空间...');
+      
+      // 检查当前使用情况
+      const currentUsage = JSON.stringify(products).length;
+      console.log('当前数据大小:', formatBytes(currentUsage));
+      
+      // 如果数据量很小但仍报错，可能是其他数据占用了空间
+      if (currentUsage < 1024 * 1024) { // 小于1MB
+        console.log('当前数据量不大，尝试清理其他localStorage数据');
+        // 可以在这里添加清理其他非必要数据的逻辑
+        return true; // 假设清理成功
+      }
+      
+      // 如果数据量很大，尝试删除最旧的商品
+      if (products.length > 0) {
+        // 按创建时间排序，删除最旧的商品
+        const sortedProducts = [...products].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        const productsToRemove = Math.max(1, Math.floor(products.length * 0.2)); // 删除20%的商品
+        
+        console.log(`尝试删除${productsToRemove}个最旧的商品...`);
+        
+        // 找出要保留的商品ID
+        const keepIds = sortedProducts.slice(productsToRemove).map(p => p.id);
+        products = products.filter(p => keepIds.includes(p.id));
+        
+        console.log(`已删除${productsToRemove}个商品，剩余${products.length}个商品`);
+        console.log('清理后数据大小:', formatBytes(JSON.stringify(products).length));
+        
+        return true;
+      }
+      
+      return false;
+    }
+    
+    // 格式化字节大小
+    function formatBytes(bytes, decimals = 2) {
+      if (bytes === 0) return '0 Bytes';
+      
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+    
+    // 生成唯一ID
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    }
+    
+    // 计算利润
+    function calculateProfit(product) {
+      if (!product.price || !product.soldDate) return 0;
+      return product.price - product.cost;
+    }
+    
+    // 格式化日期
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return `${date.getFullYear()}-${padZero(date.getMonth() + 1)}-${padZero(date.getDate())}`;
+    }
+    
+    // 数字补零
+    function padZero(num) {
+      return num.toString().padStart(2, '0');
+    }
+    
+    // 预览图片
+    function previewImage(input, previewElement, isOriginal = true) {
+      console.log('预览图片函数被调用');
+      if (input.files && input.files[0]) {
+        console.log('有文件被选择:', input.files[0]);
+        const reader = new FileReader();
+        
+        // 显示加载状态
+        previewElement.innerHTML = '<div class="flex items-center justify-center h-full"><i class="fa fa-spinner fa-spin text-primary text-2xl"></i></div>';
+        
+        reader.onload = function(e) {
+          console.log('图片读取完成，开始处理');
+          
+          // 使用canvas压缩图片
+          compressImage(e.target.result, 0.7)
+            .then(compressedDataUrl => {
+              console.log('图片压缩完成');
+              console.log('原始大小:', formatBytes(e.target.result.length));
+              console.log('压缩后大小:', formatBytes(compressedDataUrl.length));
+              
+              // 显示预览
+              previewElement.innerHTML = `<img src="${compressedDataUrl}" alt="预览图" class="w-full h-full object-cover">`;
+              console.log(`${isOriginal ? '原始' : '成品'}图片已显示预览`);
+            })
+            .catch(error => {
+              console.error('图片压缩失败:', error);
+              // 压缩失败时显示原始图片
+              previewElement.innerHTML = `<img src="${e.target.result}" alt="预览图" class="w-full h-full object-cover">`;
+            });
+        };
+        
+        reader.onerror = function(e) {
+          console.error('图片读取错误:', e);
+          previewElement.innerHTML = '<div class="flex items-center justify-center h-full"><i class="fa fa-exclamation-circle text-danger text-2xl"></i></div>';
+          previewElement.classList.add('bg-red-50');
+        };
+        
+        reader.readAsDataURL(input.files[0]);
+      } else {
+        console.log('没有选择文件');
+        // 清除图片预览
+        previewElement.innerHTML = '<i class="fa fa-camera text-gray-400 text-2xl"></i>';
+        previewElement.classList.remove('bg-red-50');
+      }
+    }
+    
+    // 压缩图片
+    function compressImage(dataUrl, quality = 0.7) {
+      return new Promise((resolve, reject) => {
+        try {
+          const img = new Image();
+          
+          img.onload = function() {
+            try {
+              // 创建canvas元素
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              
+              // 设置canvas大小为图片的1/2（缩小图片尺寸）
+              const width = Math.floor(img.width / 2);
+              const height = Math.floor(img.height / 2);
+              
+              canvas.width = width;
+              canvas.height = height;
+              
+              // 绘制图片到canvas（缩小尺寸）
+              ctx.drawImage(img, 0, 0, width, height);
+              
+              // 获取压缩后的dataURL
+              const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+              
+              resolve(compressedDataUrl);
+            } catch (error) {
+              reject(error);
+            }
+          };
+          
+          img.onerror = function(error) {
+            reject(error);
+          };
+          
+          img.src = dataUrl;
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+    
+    // 排序商品
+    function sortProducts(products) {
+      const [field, order] = currentSort.split('-');
+      
+      return products.sort((a, b) => {
+        let valueA, valueB;
+        
+        switch (field) {
+          case 'createdAt':
+            valueA = new Date(a.createdAt);
+            valueB = new Date(b.createdAt);
+            break;
+          case 'soldDate':
+            valueA = a.soldDate ? new Date(a.soldDate) : new Date(0);
+            valueB = b.soldDate ? new Date(b.soldDate) : new Date(0);
+            break;
+          case 'profit':
+            valueA = calculateProfit(a);
+            valueB = calculateProfit(b);
+            break;
+          case 'price':
+            valueA = a.price || 0;
+            valueB = b.price || 0;
+            break;
+          default:
+            valueA = a[field] || '';
+            valueB = b[field] || '';
+        }
+        
+        if (valueA < valueB) return order === 'asc' ? -1 : 1;
+        if (valueA > valueB) return order === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    // 根据日期筛选商品
+    function filterProductsByDate(products) {
+      const now = new Date();
+      let startDate, endDate;
+      
+      switch (currentFilter) {
+        case 'all':
+          return products;
+        case 'thisMonth':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          break;
+        case 'lastMonth':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+          break;
+        case 'custom':
+          startDate = new Date(currentCustomMonth.getFullYear(), currentCustomMonth.getMonth(), 1);
+          endDate = new Date(currentCustomMonth.getFullYear(), currentCustomMonth.getMonth() + 1, 0);
+          break;
+        default:
+          return products;
+      }
+      
+      // 转换为ISO字符串以便比较
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      return products.filter(product => {
+        // 未出售的商品也需要显示在统计中
+        if (!product.soldDate) return true;
+        
+        const productDateStr = product.soldDate.split('T')[0];
+        return productDateStr >= startDateStr && productDateStr <= endDateStr;
+      });
+    }
+    
+    // 更新当前月份显示
+    function updateCurrentMonthDisplay() {
+      currentMonthDisplay.textContent = `${currentCustomMonth.getFullYear()}年${currentCustomMonth.getMonth() + 1}月`;
+    
+    // 添加使用指南按钮
+    function addGuideButton() {
+      console.log('添加使用指南按钮');
+      
+      // 创建指南按钮
+      const guideButton = document.createElement('div');
+      guideButton.className = 'fixed bottom-20 right-4 z-10';
+      guideButton.innerHTML = `
+        <button id="show-guide-btn" class="w-12 h-12 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all-300">
+          <i class="fa fa-question-circle text-xl"></i>
+        </button>
+      `;
+      
+      document.body.appendChild(guideButton);
+      
+      // 添加点击事件
+      document.getElementById('show-guide-btn').addEventListener('click', () => {
+        // 创建指南菜单
+        const guideMenu = document.createElement('div');
+        guideMenu.className = 'fixed bottom-32 right-4 bg-white rounded-lg shadow-lg p-2 z-20 w-48';
+        guideMenu.innerHTML = `
+          <div class="flex flex-col space-y-1">
+            <button id="iphone-guide-btn" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+              <i class="fa fa-iphone mr-2 text-primary"></i> iPhone使用指南
+            </button>
+            <button id="no-server-guide-btn" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
+              <i class="fa fa-wifi mr-2 text-primary"></i> 无服务器解决方案
+            </button>
+          </div>
+        `;
+        
+        // 移除之前的菜单
+        const oldMenu = document.querySelector('.guide-menu');
+        if (oldMenu) {
+          oldMenu.remove();
+        }
+        
+        guideMenu.classList.add('guide-menu');
+        document.body.appendChild(guideMenu);
+        
+        // 添加菜单按钮事件
+        document.getElementById('iphone-guide-btn').addEventListener('click', () => {
+          window.location.href = 'iphone-guide.html';
+          guideMenu.remove();
+        });
+        
+        document.getElementById('no-server-guide-btn').addEventListener('click', () => {
+          window.location.href = 'no-server-guide.html';
+          guideMenu.remove();
+        });
+        
+        // 点击其他地方关闭菜单
+        const closeMenu = () => {
+          guideMenu.remove();
+          document.removeEventListener('click', closeMenu);
+        };
+        
+        setTimeout(() => {
+          document.addEventListener('click', closeMenu);
+        }, 100);
+      });
+    }
+  </script>
+</body>
+</html>
