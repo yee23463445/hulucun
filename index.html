@@ -386,7 +386,7 @@
       renderProducts();
       setupEventListeners();
       updateProfitData();
-      addGuideButton();
+      addiPhoneGuideButton();
     });
     
     // 设置事件监听器
@@ -1350,68 +1350,34 @@
     // 更新当前月份显示
     function updateCurrentMonthDisplay() {
       currentMonthDisplay.textContent = `${currentCustomMonth.getFullYear()}年${currentCustomMonth.getMonth() + 1}月`;
+    }
     
-    // 添加使用指南按钮
-    function addGuideButton() {
-      console.log('添加使用指南按钮');
-      
-      // 创建指南按钮
-      const guideButton = document.createElement('div');
-      guideButton.className = 'fixed bottom-20 right-4 z-10';
-      guideButton.innerHTML = `
-        <button id="show-guide-btn" class="w-12 h-12 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all-300">
-          <i class="fa fa-question-circle text-xl"></i>
-        </button>
-      `;
-      
-      document.body.appendChild(guideButton);
-      
-      // 添加点击事件
-      document.getElementById('show-guide-btn').addEventListener('click', () => {
-        // 创建指南菜单
-        const guideMenu = document.createElement('div');
-        guideMenu.className = 'fixed bottom-32 right-4 bg-white rounded-lg shadow-lg p-2 z-20 w-48';
-        guideMenu.innerHTML = `
-          <div class="flex flex-col space-y-1">
-            <button id="iphone-guide-btn" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
-              <i class="fa fa-iphone mr-2 text-primary"></i> iPhone使用指南
-            </button>
-            <button id="no-server-guide-btn" class="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded">
-              <i class="fa fa-wifi mr-2 text-primary"></i> 无服务器解决方案
-            </button>
-          </div>
+    // 检测是否为iPhone
+    function isiPhone() {
+      return /iPhone|iPod/.test(navigator.userAgent);
+    }
+    
+    // 添加iPhone使用指南按钮
+    function addiPhoneGuideButton() {
+      if (isiPhone()) {
+        console.log('检测到iPhone设备，显示使用指南按钮');
+        
+        // 创建指南按钮
+        const guideButton = document.createElement('div');
+        guideButton.className = 'fixed bottom-20 right-4 z-10';
+        guideButton.innerHTML = `
+          <button id="show-guide-btn" class="w-12 h-12 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all-300">
+            <i class="fa fa-question-circle text-xl"></i>
+          </button>
         `;
         
-        // 移除之前的菜单
-        const oldMenu = document.querySelector('.guide-menu');
-        if (oldMenu) {
-          oldMenu.remove();
-        }
+        document.body.appendChild(guideButton);
         
-        guideMenu.classList.add('guide-menu');
-        document.body.appendChild(guideMenu);
-        
-        // 添加菜单按钮事件
-        document.getElementById('iphone-guide-btn').addEventListener('click', () => {
+        // 添加点击事件
+        document.getElementById('show-guide-btn').addEventListener('click', () => {
           window.location.href = 'iphone-guide.html';
-          guideMenu.remove();
         });
-        
-        document.getElementById('no-server-guide-btn').addEventListener('click', () => {
-          window.location.href = 'no-server-guide.html';
-          guideMenu.remove();
-        });
-        
-        // 点击其他地方关闭菜单
-        const closeMenu = () => {
-          guideMenu.remove();
-          document.removeEventListener('click', closeMenu);
-        };
-        
-        setTimeout(() => {
-          document.addEventListener('click', closeMenu);
-        }, 100);
-      });
+      }
     }
   </script>
 </body>
